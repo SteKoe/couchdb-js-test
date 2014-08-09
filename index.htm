@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="Stephan Koeninger">
+
+    <title>PouchDB and CouchDB</title>
+    <link href="./bootstrap/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+    body {
+	    padding-top: 50px;
+  	}
+  	.starter-template {
+	    padding: 40px 15px;
+	    text-align: center;
+  	}
+    </style>
+  </head>
+
+  <body>
+
+    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="">pouchDB</a>
+        </div>
+        <div class="collapse navbar-collapse">
+          <ul class="nav navbar-nav">
+          </ul>
+        </div><!--/.nav-collapse -->
+      </div>
+    </div>
+
+    <div class="container">
+		<div class="row">
+			<div class="col-md-4">
+				<h1>Add Entry</h1>
+				<form class="">
+					<div class="form-group">
+						<label>Name</label>
+						<input type="text" id="name" class="form-control">
+					</div>
+					<div class="form-group">
+						<label>Age</label>
+						<input type="number" id="age" class="form-control">
+					</div>
+					<div class="form-group text-right">
+						<button id="submit" type="button" class="btn btn-success btn-sm">
+							Save
+						</button>
+					</div>
+				</form>
+			</div>
+			<div class="col-md-8">
+				<h1>Entries</h1>
+				<table class="table" id="entries">
+					<thead>
+						<tr>
+							<th>Name</th>
+							<th width="10%" class="text-center">Age</th>
+              <th width="10%"></th>
+						</tr>
+					</thead>
+					<tbody>
+					</tbody>
+				</table>
+			</div>
+		</div>
+    </div>
+    <!-- /.container -->
+
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="./bootstrap/js/bootstrap.min.js"></script>
+    <script src="./js/pouchdb-2.2.3.min.js"></script>
+    <script src="./js/uuid.js"></script>
+    <script src="./js/StringUtils.js"></script>
+    <script>
+
+
+    var $entriesTableBody = $('#entries > tbody');
+
+    // Create new database and connect to remote
+    var couchDbName = "testdb";
+    var db = new PouchDB(couchDbName);
+    // Listen to remote in "live" mode.. Pulls remote changes immediatelly
+    db.sync('http://127.0.0.1:5984/' + couchDbName, {
+      "live":true
+    });
+
+    $(document).ready(function(){
+      fetchAllData();
+
+    	$('#submit').click(function(){
+        var name = $("#name").val();
+        var age = $('#age').val();
+        if(!StringUtils.isBlank(name) && !StringUtils.isBlank(age)) {
+          write({
+            "name": name,
+            "age": age
+          });
+          $("#name").val("");
+          $('#age').val("");
+        } else {
+          alert("You have to enter name and age!");
+        }
+    	});
+    });
+
+    /*
+     * Fetches data from database
+     */
+    function fetchAllData() {
+      $entriesTableBody.empty();
+	    db.allDocs({"include_docs":true}, function(err, doc){
+        $entriesTableBody.empty();
+	    	var rows = doc.rows;
+	    	$.each(rows, function(idx, a){
+	    		var $tr = $(document.createElement("tr"));
+	    		var $tdName = $(document.createElement("td"));
+	    		var $tdAge = $(document.createElement("td")).addClass("text-center");
+          var $tdActions = $(document.createElement("td")).addClass("text-right");
+          var $deleteButton = $(document.createElement("a"));
+          $deleteButton.addClass("btn btn-danger btn-xs");
+          $deleteButton.append($(document.createElement("span")).addClass("glyphicon glyphicon-trash"));
+          $deleteButton.on("click", function() {
+            remove(a.doc._id);
+            fetchAllData();
+          });
+
+	    		$tdName.html(a.doc.name);
+	    		$tdAge.html(a.doc.age);
+          $tdActions.append($deleteButton);
+
+	    		$tr.append($tdName).append($tdAge).append($tdActions);
+	    		$entriesTableBody.append($tr);
+	    	});
+	    });
+    }
+
+    // If any change is detected wether remote or local, pull all changes immediatelly.
+    db.changes({live: true}).on("change", function() {
+      fetchAllData();
+    });
+
+    // Remove entry with given id from database
+    function remove(id) {
+        db.get(id, function(err, doc) {
+          db.remove(doc);
+          fetchAllData();
+        });
+    };
+
+    // Writes json object o to database
+  	function write(o) {
+  	    db.put(o, guid());
+        fetchAllData();
+  	};
+    </script>
+  </body>
+</html>
